@@ -20,29 +20,25 @@ import "../src/interfaces/IAggregatorV3Interface.sol";
 
 // Composable CoW
 import "../src/ComposableCoW.sol";
-import "../src/types/twap/TWAP.sol";
-import {GoodAfterTime} from "../src/types/GoodAfterTime.sol";
-import {PerpetualStableSwap} from "../src/types/PerpetualStableSwap.sol";
-import {TradeAboveThreshold} from "../src/types/TradeAboveThreshold.sol";
-import {StopLoss} from "../src/types/StopLoss.sol";
+import {Limit4D} from "../src/types/Limit4D.sol";
 
 /**
  * @title Submit a single order to ComposableCoW
  * @author 0xAegir <paul@early.xyz>
  */
-contract SubmitSingleStopLoss is Script {
+contract SubmitSingleLimit4D is Script {
     using SafeLib for Safe;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         Safe safe = Safe(payable(vm.envAddress("SAFE")));
-        StopLoss stopLoss = StopLoss(vm.envAddress("STOP_LOSS"));
+        Limit4D limit4D = Limit4D(vm.envAddress("4D_LIMIT"));
         ComposableCoW composableCow = ComposableCoW(vm.envAddress("COMPOSABLE_COW"));
         IAggregatorV3Interface sellTokenPriceOracle = IAggregatorV3Interface(vm.envAddress("SELL_TOKEN_PRICE_ORACLE"));
         IAggregatorV3Interface buyTokenPriceOracle = IAggregatorV3Interface(vm.envAddress("BUY_TOKEN_PRICE_ORACLE"));
 
-        StopLoss.Data memory orderData = StopLoss.Data({
+        Limit4D.Data memory orderData = Limit4D.Data({
             sellToken: IERC20(address(0x1)),
             buyToken: IERC20(address(0x2)),
             sellTokenPriceOracle: sellTokenPriceOracle,
@@ -69,8 +65,8 @@ contract SubmitSingleStopLoss is Script {
                 composableCow.create,
                 (
                     IConditionalOrder.ConditionalOrderParams({
-                        handler: IConditionalOrder(stopLoss),
-                        salt: keccak256(abi.encodePacked("STOP_LOSS")),
+                        handler: IConditionalOrder(limit4D),
+                        salt: keccak256(abi.encodePacked("4D_LIMIT")),
                         staticInput: abi.encode(orderData)
                     }),
                     true

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.0 <0.9.0;
 
+import "forge-std/console2.sol";
+
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 
 import "../BaseConditionalOrder.sol";
@@ -17,17 +19,17 @@ string constant ORACLE_STALE_PRICE = "oracle stale price";
 string constant STRIKE_NOT_REACHED = "strike not reached";
 
 /**
- * @title StopLoss conditional order
+ * @title Limit4D conditional order
  * Requires providing two price oracles (e.g. chainlink) and a strike price. If the sellToken price falls below the strike price, the order will be triggered
  * @notice Both oracles need to be denominated in the same quote currency (e.g. GNO/ETH and USD/ETH for GNO/USD stop loss orders)
  * @dev This order type does not have any replay protection, meaning it may trigger again in the next validityBucket (e.g. 00:15-00:30)
  */
-contract StopLoss is BaseConditionalOrder {
+contract Limit4D is BaseConditionalOrder {
     /// @dev Scaling factor for the strike price
     int256 constant SCALING_FACTOR = 10 ** 18;
 
     /**
-     * Defines the parameters of a StopLoss order
+     * Defines the parameters of a Limit4D order
      * @param sellToken: the token to be sold
      * @param buyToken: the token to be bought
      * @param sellAmount: In case of a sell order, the exact amount of tokens the order is willing to sell. In case of a buy order, the maximium amount of tokens it is willing to sell
@@ -39,7 +41,8 @@ contract StopLoss is BaseConditionalOrder {
      * @param validityBucketSeconds: How long the order will be valid. E.g. if the validityBucket is set to 15 minutes and the order is placed at 00:08, it will be valid until 00:15
      * @param sellTokenPriceOracle: A chainlink-like oracle returning the current sell token price in a given numeraire
      * @param buyTokenPriceOracle: A chainlink-like oracle returning the current buy token price in the same numeraire
-     * @param strike: The exchange rate (denominated in sellToken/buyToken) which triggers the StopLoss order if the oracle price falls below. Specified in base / quote with 18 decimals.
+     * @param strikeTimes: The times paired to each strikeValue. The strikeTime and strikeValue together are interpolated to determine the strikePrice at any intermediate point.
+     * @param strikeValues: The exchange rate (denominated in sellToken/buyToken) which triggers the Limit4D order if the oracle price falls below. Specified in base / quote with 18 decimals.
      * @param maxTimeSinceLastOracleUpdate: The maximum time since the last oracle update. If the oracle hasn't been updated in this time, the order will be considered invalid
      */
     struct Data {
@@ -54,7 +57,8 @@ contract StopLoss is BaseConditionalOrder {
         uint32 validityBucketSeconds;
         IAggregatorV3Interface sellTokenPriceOracle;
         IAggregatorV3Interface buyTokenPriceOracle;
-        int256 strike;
+        int256[] strikeTimes;
+        int256[] strikePrices;
         uint256 maxTimeSinceLastOracleUpdate;
     }
 
@@ -85,13 +89,29 @@ contract StopLoss is BaseConditionalOrder {
                 revert IConditionalOrder.OrderNotValid(ORACLE_STALE_PRICE);
             }
 
+            /// @dev Interpolate the strike price at the current time
+            int256 strikePrice = interpolate(data.strikeTimes, data.strikePrices, int256(block.timestamp));
+            console2.log("block.timestamp: %d", int256(block.timestamp));
+            console2.log("strikes: [");
+            for (uint8 i = 0; i < data.strikeTimes.length; i++) {
+              console2.logString("(");
+              console2.logInt(data.strikeTimes[i]);
+              console2.logInt(data.strikePrices[i]);
+              console2.logString(")");
+            }
+            console2.log("]");
+            console2.log("strikePrice: %d", strikePrice);
+
             // Normalize the decimals for basePrice and quotePrice, scaling them to 18 decimals
             // Caution: Ensure that base and quote have the same numeraires (e.g. both are denominated in USD)
             basePrice = Utils.scalePrice(basePrice, data.sellTokenPriceOracle.decimals(), 18);
             quotePrice = Utils.scalePrice(quotePrice, data.buyTokenPriceOracle.decimals(), 18);
 
+            console2.log("basePrice: %d", basePrice);
+            console2.log("quotePrice: %d", quotePrice);
+
             /// @dev Scale the strike price to 18 decimals.
-            if (!(basePrice * SCALING_FACTOR / quotePrice <= data.strike)) {
+            if (!(basePrice * SCALING_FACTOR / quotePrice <= strikePrice)) {
                 revert IConditionalOrder.OrderNotValid(STRIKE_NOT_REACHED);
             }
         }
@@ -110,5 +130,40 @@ contract StopLoss is BaseConditionalOrder {
             GPv2Order.BALANCE_ERC20,
             GPv2Order.BALANCE_ERC20
         );
+    }
+
+    /**
+     * Given an array of coordinates, and an x position, interpolate the y
+     * value at the given x. Coordinates outside the given pairs are
+     * extrapolated.
+     * @param xs array of x coordinates
+     * @param ys array of y coordinates
+     * @param x coordinate to interpolate the y value for
+     */
+    function interpolate(int256[] memory xs, int256[] memory ys, int256 x) internal pure returns (int256) {
+        require(xs.length > 0, "xs.length must be greater than 0");
+        require(ys.length > 0, "ys.length must be greater than 0");
+        require(xs.length == ys.length, "xs.length must equal ys.length");
+
+        // Single coordinate is treated as a flat line.
+        if (ys.length == 1) {
+          return ys[0];
+        }
+
+        // Find the first pair which contains the target x
+        int256 x0 = xs[0];
+        int256 y0 = ys[0];
+        int256 x1 = xs[1];
+        int256 y1 = ys[1];
+        for (uint i = 0; i < xs.length-1; i++) {
+            if (x <= x1) {
+                break;
+            }
+            x0 = xs[i];
+            y0 = ys[i];
+            x1 = xs[i+1];
+            y1 = ys[i+1];
+        }
+        return ((y0 * (x1 - x)) + (y1 * (x - x0))) / (x1 - x0);
     }
 }

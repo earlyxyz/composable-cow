@@ -5,9 +5,9 @@ import {IERC20Metadata} from "@openzeppelin/interfaces/IERC20Metadata.sol";
 
 import "./ComposableCoW.base.t.sol";
 import "../src/interfaces/IAggregatorV3Interface.sol";
-import "../src/types/StopLoss.sol";
+import "../src/types/Limit4D.sol";
 
-contract ComposableCoWStopLossTest is BaseComposableCoWTest {
+contract ComposableCoWLimit4DTest is BaseComposableCoWTest {
     IERC20Metadata immutable SELL_TOKEN = IERC20Metadata(address(0x1));
     IERC20Metadata immutable BUY_TOKEN = IERC20Metadata(address(0x2));
     address constant SELL_ORACLE = address(0x3);
@@ -16,13 +16,13 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
 
     uint8 constant DEFAULT_DECIMALS = 18;
 
-    StopLoss stopLoss;
+    Limit4D limit4D;
     address safe;
 
     function setUp() public virtual override(BaseComposableCoWTest) {
         super.setUp();
 
-        stopLoss = new StopLoss();
+        limit4D = new Limit4D();
     }
 
     function priceToAddress(int256 price) internal returns (address) {
@@ -43,16 +43,31 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         vm.mockCall(address(token), abi.encodeWithSelector(iface.decimals.selector), abi.encode(decimals));
     }
 
-    function test_strikePriceNotMet_concrete() public {
+    function test_strikePriceArrayNotMet_concrete() public {
+        // TODO: test with multiple strike prices
+        //       - interpolated
+        //       - extrapolated left
+        //       - extrapolated right
+        //       - fuzz
+
         // prevents underflow when checking for stale prices
         vm.warp(30 minutes);
 
-        StopLoss.Data memory data = StopLoss.Data({
+        int256[] memory strikeTimes = new int256[](2);
+        strikeTimes[0] = int256(block.timestamp);
+        strikeTimes[1] = int256(block.timestamp + 10 minutes);
+
+        int256[] memory strikePrices = new int256[](2);
+        strikePrices[0] = 10;
+        strikePrices[1] = 20;
+
+        Limit4D.Data memory data = Limit4D.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 200 ether, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, block.timestamp, DEFAULT_DECIMALS),
-            strike: 1,
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -63,10 +78,43 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
             maxTimeSinceLastOracleUpdate: 15 minutes
         });
 
-        createOrder(stopLoss, 0x0, abi.encode(data));
+        createOrder(limit4D, 0x0, abi.encode(data));
 
         vm.expectRevert(abi.encodeWithSelector(IConditionalOrder.OrderNotValid.selector, STRIKE_NOT_REACHED));
-        stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+        limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+    }
+
+    function test_strikePriceNotMet_concrete() public {
+        // prevents underflow when checking for stale prices
+        vm.warp(30 minutes);
+
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = 1;
+
+        Limit4D.Data memory data = Limit4D.Data({
+            sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
+            buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
+            sellTokenPriceOracle: mockOracle(SELL_ORACLE, 200 ether, block.timestamp, DEFAULT_DECIMALS),
+            buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, block.timestamp, DEFAULT_DECIMALS),
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
+            sellAmount: 1 ether,
+            buyAmount: 1 ether,
+            appData: APP_DATA,
+            receiver: address(0x0),
+            isSellOrder: false,
+            isPartiallyFillable: false,
+            validityBucketSeconds: 15 minutes,
+            maxTimeSinceLastOracleUpdate: 15 minutes
+        });
+
+        createOrder(limit4D, 0x0, abi.encode(data));
+
+        vm.expectRevert(abi.encodeWithSelector(IConditionalOrder.OrderNotValid.selector, STRIKE_NOT_REACHED));
+        limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
     }
 
     function test_RevertStrikePriceNotMet_fuzz(
@@ -84,12 +132,19 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
 
         vm.warp(currentTime);
 
-        StopLoss.Data memory data = StopLoss.Data({
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = strike;
+
+        Limit4D.Data memory data = Limit4D.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, sellTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, buyTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
-            strike: strike,
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -101,7 +156,7 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         });
 
         vm.expectRevert(abi.encodeWithSelector(IConditionalOrder.OrderNotValid.selector, STRIKE_NOT_REACHED));
-        stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+        limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
     }
 
     function test_OracleNormalisesPrice_fuzz(
@@ -122,7 +177,21 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
 
         vm.warp(1687718451);
 
-        StopLoss.Data memory data = StopLoss.Data({
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        // Strike price is to 18 decimals, base / quote. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
+        strikePrices[0] = int256(
+            1900
+                * (
+                    sellTokenERC20Decimals > buyTokenERC20Decimals
+                        ? (10 ** (sellTokenERC20Decimals - buyTokenERC20Decimals + 18))
+                        : (10 ** (buyTokenERC20Decimals - sellTokenERC20Decimals + 18))
+                )
+        );
+
+        Limit4D.Data memory data = Limit4D.Data({
             sellToken: mockToken(SELL_TOKEN, sellTokenERC20Decimals),
             buyToken: mockToken(BUY_TOKEN, buyTokenERC20Decimals),
             sellTokenPriceOracle: mockOracle(
@@ -131,14 +200,8 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
             buyTokenPriceOracle: mockOracle(
                 BUY_ORACLE, int256(1 * (10 ** buyTokenOracleDecimals)), block.timestamp, buyTokenOracleDecimals
                 ),
-            strike: int256(
-                1900
-                    * (
-                        sellTokenERC20Decimals > buyTokenERC20Decimals
-                            ? (10 ** (sellTokenERC20Decimals - buyTokenERC20Decimals + 18))
-                            : (10 ** (buyTokenERC20Decimals - sellTokenERC20Decimals + 18))
-                    )
-                ), // Strike price is to 18 decimals, base / quote. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1,
             appData: APP_DATA,
@@ -150,7 +213,7 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         });
 
         GPv2Order.Data memory order =
-            stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+            limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
         assertEq(address(order.sellToken), address(SELL_TOKEN));
         assertEq(address(order.buyToken), address(BUY_TOKEN));
         assertEq(order.sellAmount, 1 ether);
@@ -169,12 +232,20 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         // 25 June 2023 18:40:51
         vm.warp(1687718451);
 
-        StopLoss.Data memory data = StopLoss.Data({
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        // Strike price is base / quote to 18 decimals. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
+        strikePrices[0] = 1900_000_000_000_000_000_000;
+
+        Limit4D.Data memory data = Limit4D.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS), // simulate ETH (using the ETH/USD chainlink)
             buyToken: mockToken(BUY_TOKEN, 6), // simulate USDC (using the USDC/USD chainlink)
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 183_449_235_095, block.timestamp, 8), // assume price is 1834.49235095 ETH/USD
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100_000_000, block.timestamp, 8), // assume 1:1 USDC:USD
-            strike: 1900_000_000_000_000_000_000, // Strike price is base / quote to 18 decimals. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1,
             appData: APP_DATA,
@@ -186,7 +257,7 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         });
 
         GPv2Order.Data memory order =
-            stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+            limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
         assertEq(address(order.sellToken), address(SELL_TOKEN));
         assertEq(address(order.buyToken), address(BUY_TOKEN));
         assertEq(order.sellAmount, 1 ether);
@@ -214,12 +285,19 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
 
         vm.warp(currentTime);
 
-        StopLoss.Data memory data = StopLoss.Data({
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = 1;
+
+        Limit4D.Data memory data = Limit4D.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 100 ether, updatedAt, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, updatedAt, DEFAULT_DECIMALS),
-            strike: 1,
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -231,7 +309,7 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         });
 
         vm.expectRevert(abi.encodeWithSelector(IConditionalOrder.OrderNotValid.selector, ORACLE_STALE_PRICE));
-        stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+        limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
     }
 
     function test_OracleRevertOnInvalidPrice_fuzz(int256 invalidPrice, int256 validPrice) public {
@@ -243,12 +321,20 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
 
         // case where sell token price is invalid
 
-        StopLoss.Data memory data = StopLoss.Data({
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = 1;
+
+
+        Limit4D.Data memory data = Limit4D.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, invalidPrice, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, validPrice, block.timestamp, DEFAULT_DECIMALS),
-            strike: 1,
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -260,7 +346,7 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         });
 
         vm.expectRevert(abi.encodeWithSelector(IConditionalOrder.OrderNotValid.selector, ORACLE_INVALID_PRICE));
-        stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+        limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
 
         // case where buy token price is invalid
 
@@ -268,7 +354,7 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         data.buyTokenPriceOracle = mockOracle(BUY_ORACLE, invalidPrice, block.timestamp, DEFAULT_DECIMALS);
 
         vm.expectRevert(abi.encodeWithSelector(IConditionalOrder.OrderNotValid.selector, ORACLE_INVALID_PRICE));
-        stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+        limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
     }
 
     function test_strikePriceMet_fuzz(int256 sellTokenOraclePrice, int256 buyTokenOraclePrice, int256 strike) public {
@@ -280,12 +366,19 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         // 25 June 2023 18:40:51
         vm.warp(1687718451);
 
-        StopLoss.Data memory data = StopLoss.Data({
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = strike;
+
+        Limit4D.Data memory data = Limit4D.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, sellTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, buyTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
-            strike: strike,
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -297,7 +390,64 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         });
 
         GPv2Order.Data memory order =
-            stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+            limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+        assertEq(address(order.sellToken), address(SELL_TOKEN));
+        assertEq(address(order.buyToken), address(BUY_TOKEN));
+        assertEq(order.sellAmount, 1 ether);
+        assertEq(order.buyAmount, 1 ether);
+        assertEq(order.receiver, address(0x0));
+        assertEq(order.validTo, 1687718700);
+        assertEq(order.appData, APP_DATA);
+        assertEq(order.feeAmount, 0);
+        assertEq(order.kind, GPv2Order.KIND_BUY);
+        assertEq(order.partiallyFillable, false);
+        assertEq(order.sellTokenBalance, GPv2Order.BALANCE_ERC20);
+        assertEq(order.buyTokenBalance, GPv2Order.BALANCE_ERC20);
+    }
+
+    function test_strikePriceArrayMet_fuzz(int256 sellTokenOraclePrice, int256 buyTokenOraclePrice, int256 strikeBefore, int256 strikeAfter) public {
+        vm.assume(buyTokenOraclePrice > 0);
+        vm.assume(sellTokenOraclePrice > 0 && sellTokenOraclePrice <= type(int256).max / 10 ** 18);
+        vm.assume(strikeBefore > 0);
+        vm.assume(strikeBefore <= type(int256).max / 10**18);
+        vm.assume(strikeAfter > 0);
+        vm.assume(strikeAfter <= type(int256).max / 10**18);
+
+        // For this test we set the current time to half-way between the two
+        // strike prices, so the interpolated value "now" should be the mean.
+        int256 meanStrike = strikeBefore + ((strikeAfter - strikeBefore) / 2);
+        vm.assume(sellTokenOraclePrice * int256(10 ** 18) / buyTokenOraclePrice <= meanStrike);
+
+        // 25 June 2023 18:40:51
+        vm.warp(1687718451);
+
+        int256[] memory strikeTimes = new int256[](2);
+        strikeTimes[0] = int256(block.timestamp - 10 minutes);
+        strikeTimes[1] = int256(block.timestamp + 10 minutes);
+
+        int256[] memory strikePrices = new int256[](2);
+        strikePrices[0] = strikeBefore;
+        strikePrices[1] = strikeAfter;
+
+        Limit4D.Data memory data = Limit4D.Data({
+            sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
+            buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
+            sellTokenPriceOracle: mockOracle(SELL_ORACLE, sellTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
+            buyTokenPriceOracle: mockOracle(BUY_ORACLE, buyTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
+            sellAmount: 1 ether,
+            buyAmount: 1 ether,
+            appData: APP_DATA,
+            receiver: address(0x0),
+            isSellOrder: false,
+            isPartiallyFillable: false,
+            validityBucketSeconds: 15 minutes,
+            maxTimeSinceLastOracleUpdate: 15 minutes
+        });
+
+        GPv2Order.Data memory order =
+            limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
         assertEq(address(order.sellToken), address(SELL_TOKEN));
         assertEq(address(order.buyToken), address(BUY_TOKEN));
         assertEq(order.sellAmount, 1 ether);
@@ -315,12 +465,20 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
     function test_validTo() public {
         uint256 BLOCK_TIMESTAMP = 1687712399;
 
-        StopLoss.Data memory data = StopLoss.Data({
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = 1e18;
+
+
+        Limit4D.Data memory data = Limit4D.Data({
             sellToken: mockToken(SELL_TOKEN, 18),
             buyToken: mockToken(BUY_TOKEN, 18),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 99 ether, BLOCK_TIMESTAMP, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, BLOCK_TIMESTAMP, DEFAULT_DECIMALS),
-            strike: 1e18, // required as the strike price has 18 decimals
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -334,12 +492,12 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         // 25 June 2023 18:59:59
         vm.warp(BLOCK_TIMESTAMP);
         GPv2Order.Data memory order =
-            stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+            limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
         assertEq(order.validTo, BLOCK_TIMESTAMP + 1); // 25 June 2023 19:00:00
 
         // 25 June 2023 19:00:00
         vm.warp(BLOCK_TIMESTAMP + 1);
-        order = stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+        order = limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
         assertEq(order.validTo, BLOCK_TIMESTAMP + 1 + 1 hours); // 25 June 2023 20:00:00
     }
 }
