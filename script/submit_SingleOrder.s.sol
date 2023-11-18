@@ -37,10 +37,10 @@ contract SubmitSingleOrder is Script {
         ComposableCoW composableCow = ComposableCoW(vm.envAddress("COMPOSABLE_COW"));
 
         TWAPOrder.Data memory twapOrder = TWAPOrder.Data({
-            sellToken: IERC20(address(1)),
-            buyToken: IERC20(address(2)),
-            receiver: address(0),
-            partSellAmount: 10,
+            sellToken: IERC20(address(vm.envAddress("SELL_TOKEN"))),
+            buyToken: IERC20(address(vm.envAddress("BUY_TOKEN"))),
+            receiver: address(safe),
+            partSellAmount: 10_000_000, // 0.1 dai
             minPartLimit: 1,
             t0: block.timestamp,
             n: 10,

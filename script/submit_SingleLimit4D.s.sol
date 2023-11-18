@@ -38,13 +38,18 @@ contract SubmitSingleLimit4D is Script {
         IAggregatorV3Interface sellTokenPriceOracle = IAggregatorV3Interface(vm.envAddress("SELL_TOKEN_PRICE_ORACLE"));
         IAggregatorV3Interface buyTokenPriceOracle = IAggregatorV3Interface(vm.envAddress("BUY_TOKEN_PRICE_ORACLE"));
 
-        int256[] memory strikeTimes = new int256[](2);
+        int256[] memory strikeTimes = new int256[](4);
         strikeTimes[0] = 0;
-        strikeTimes[1] = 1;
+        strikeTimes[1] = 1700349021;
+        strikeTimes[2] = 1700349022;
+        strikeTimes[3] = type(int256).max;
 
-        int256[] memory strikePrices = new int256[](2);
+        int256[] memory strikePrices = new int256[](4);
         strikePrices[0] = 0;
-        strikePrices[1] = 1;
+        strikePrices[1] = 0;
+        strikePrices[2] = type(int256).max;
+        strikePrices[3] = type(int256).max;
+
 
         Limit4D.Data memory orderData = Limit4D.Data({
             sellToken: IERC20(address(vm.envAddress("SELL_TOKEN"))),
@@ -53,14 +58,14 @@ contract SubmitSingleLimit4D is Script {
             buyTokenPriceOracle: buyTokenPriceOracle,
             strikeTimes: strikeTimes,
             strikePrices: strikePrices,
-            sellAmount: 10,
-            buyAmount: 10,
+            sellAmount: 1e18 / 10, // 0.1 dai
+            buyAmount: 1, // min buy amount
             appData: bytes32(0x0),
-            receiver: address(0),
-            isSellOrder: false,
-            isPartiallyFillable: false,
-            validityBucketSeconds: 60 minutes,
-            maxTimeSinceLastOracleUpdate: 15 minutes
+            receiver: address(safe),
+            isSellOrder: true,
+            isPartiallyFillable: true,
+            validityBucketSeconds: 15 minutes,
+            maxTimeSinceLastOracleUpdate: 48 hours
         });
 
         vm.startBroadcast(deployerPrivateKey);
