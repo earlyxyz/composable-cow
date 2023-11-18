@@ -30,39 +30,4 @@ library ConditionalOrdersUtilsLib {
         }
         return oraclePrice;
     }
-
-    /**
-     * Given an array of coordinates, and an x position, interpolate the y
-     * value at the given x. Coordinates outside the given pairs are
-     * extrapolated.
-     * @param xs array of x coordinates
-     * @param ys array of y coordinates
-     * @param x coordinate to interpolate the y value for
-     */
-    function interpolate(int256[] memory xs, int256[] memory ys, int256 x) internal pure returns (int256) {
-        require(xs.length > 0, "xs.length must be greater than 0");
-        require(ys.length > 0, "ys.length must be greater than 0");
-        require(xs.length == ys.length, "xs.length must equal ys.length");
-
-        // Single x coordinate is treated as a flat line.
-        if (xs.length == 1 && ys.length == 1) {
-          return xs[0];
-        }
-
-        // Find the first pair which contains the target x
-        int256 x0 = xs[0];
-        int256 y0 = ys[0];
-        int256 x1 = xs[1];
-        int256 y1 = ys[1];
-        for (uint i = 0; i < xs.length-1; i++) {
-            if (x <= x1) {
-                break;
-            }
-            x0 = xs[i];
-            y0 = ys[i];
-            x1 = xs[i+1];
-            y1 = ys[i+1];
-        }
-        return ((y0 * (x1 - x)) + (y1 * (x - x0))) / (x1 - x0);
-    }
 }
