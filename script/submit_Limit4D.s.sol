@@ -38,13 +38,21 @@ contract SubmitSingleLimit4D is Script {
         IAggregatorV3Interface sellTokenPriceOracle = IAggregatorV3Interface(vm.envAddress("SELL_TOKEN_PRICE_ORACLE"));
         IAggregatorV3Interface buyTokenPriceOracle = IAggregatorV3Interface(vm.envAddress("BUY_TOKEN_PRICE_ORACLE"));
 
+        int256[] memory strikeTimes = new int256[](2);
+        strikeTimes[0] = 0;
+        strikeTimes[1] = 1;
+
+        int256[] memory strikePrices = new int256[](2);
+        strikePrices[0] = 0;
+        strikePrices[1] = 1;
+
         Limit4D.Data memory orderData = Limit4D.Data({
-            sellToken: IERC20(address(0x1)),
-            buyToken: IERC20(address(0x2)),
+            sellToken: IERC20(address(vm.envAddress("SELL_TOKEN"))),
+            buyToken: IERC20(address(vm.envAddress("BUY_TOKEN"))),
             sellTokenPriceOracle: sellTokenPriceOracle,
             buyTokenPriceOracle: buyTokenPriceOracle,
-            strikeTimes: new int256[](0),
-            strikePrices: new int256[](1),
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 10,
             buyAmount: 10,
             appData: bytes32(0x0),
