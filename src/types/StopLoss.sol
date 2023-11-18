@@ -56,7 +56,7 @@ contract StopLoss is BaseConditionalOrder {
         IAggregatorV3Interface sellTokenPriceOracle;
         IAggregatorV3Interface buyTokenPriceOracle;
         int256[] strikeTimes;
-        int256[] strikeValues;
+        int256[] strikePrices;
         uint256 maxTimeSinceLastOracleUpdate;
     }
 
@@ -88,7 +88,7 @@ contract StopLoss is BaseConditionalOrder {
             }
 
             /// @dev Interpolate the strike price at the current time
-            strikePrice = Utils.interpolate(data.strikeTimes, data.strikeValues, int256(block.timestamp));
+            int256 strikePrice = Utils.interpolate(data.strikeTimes, data.strikePrices, int256(block.timestamp));
 
             // Normalize the decimals for basePrice and quotePrice, scaling them to 18 decimals
             // Caution: Ensure that base and quote have the same numeraires (e.g. both are denominated in USD)
