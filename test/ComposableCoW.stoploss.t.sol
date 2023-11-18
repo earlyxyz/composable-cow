@@ -409,7 +409,9 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         vm.assume(buyTokenOraclePrice > 0);
         vm.assume(sellTokenOraclePrice > 0 && sellTokenOraclePrice <= type(int256).max / 10 ** 18);
         vm.assume(strikeBefore > 0);
+        vm.assume(strikeBefore <= type(int256).max / 10**18);
         vm.assume(strikeAfter > 0);
+        vm.assume(strikeAfter <= type(int256).max / 10**18);
 
         // For this test we set the current time to half-way between the two
         // strike prices, so the interpolated value "now" should be the mean.
