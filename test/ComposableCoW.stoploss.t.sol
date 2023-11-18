@@ -43,6 +43,14 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         vm.mockCall(address(token), abi.encodeWithSelector(iface.decimals.selector), abi.encode(decimals));
     }
 
+    function test_strikePriceArrayNotMet_concrete() public {
+      // TODO: test with multiple strike prices
+      //       - extrapolated left
+      //       - extrapolated right
+      //       - interpolated
+      //       - fuzz
+    }
+
     function test_strikePriceNotMet_concrete() public {
         // prevents underflow when checking for stale prices
         vm.warp(30 minutes);
@@ -52,7 +60,8 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 200 ether, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, block.timestamp, DEFAULT_DECIMALS),
-            strike: 1,
+            strikeTimes: new int256[](0),
+            strikePrices: new int256[](1),
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -89,7 +98,9 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, sellTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, buyTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
-            strike: strike,
+            strikeTimes: new int256[](0),
+            // TODO: Figure out why we have to convert to uint256 here. wtf.
+            strikePrices: new int256[](uint256(strike)),
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -131,14 +142,16 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
             buyTokenPriceOracle: mockOracle(
                 BUY_ORACLE, int256(1 * (10 ** buyTokenOracleDecimals)), block.timestamp, buyTokenOracleDecimals
                 ),
-            strike: int256(
+            strikeTimes: new int256[](0),
+            strikePrices: new int256[](uint256(
                 1900
                     * (
                         sellTokenERC20Decimals > buyTokenERC20Decimals
                             ? (10 ** (sellTokenERC20Decimals - buyTokenERC20Decimals + 18))
                             : (10 ** (buyTokenERC20Decimals - sellTokenERC20Decimals + 18))
                     )
-                ), // Strike price is to 18 decimals, base / quote. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
+                )
+            ), // Strike price is to 18 decimals, base / quote. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
             sellAmount: 1 ether,
             buyAmount: 1,
             appData: APP_DATA,
@@ -174,7 +187,8 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
             buyToken: mockToken(BUY_TOKEN, 6), // simulate USDC (using the USDC/USD chainlink)
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 183_449_235_095, block.timestamp, 8), // assume price is 1834.49235095 ETH/USD
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100_000_000, block.timestamp, 8), // assume 1:1 USDC:USD
-            strike: 1900_000_000_000_000_000_000, // Strike price is base / quote to 18 decimals. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
+            strikeTimes: new int256[](0),
+            strikePrices: new int256[](1900_000_000_000_000_000_000), // Strike price is base / quote to 18 decimals. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
             sellAmount: 1 ether,
             buyAmount: 1,
             appData: APP_DATA,
@@ -219,7 +233,8 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 100 ether, updatedAt, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, updatedAt, DEFAULT_DECIMALS),
-            strike: 1,
+            strikeTimes: new int256[](0),
+            strikePrices: new int256[](1),
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -248,7 +263,8 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, invalidPrice, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, validPrice, block.timestamp, DEFAULT_DECIMALS),
-            strike: 1,
+            strikeTimes: new int256[](0),
+            strikePrices: new int256[](1),
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -285,7 +301,8 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, sellTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, buyTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
-            strike: strike,
+            strikeTimes: new int256[](0),
+            strikePrices: new int256[](uint256(strike)),
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -320,7 +337,8 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
             buyToken: mockToken(BUY_TOKEN, 18),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 99 ether, BLOCK_TIMESTAMP, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, BLOCK_TIMESTAMP, DEFAULT_DECIMALS),
-            strike: 1e18, // required as the strike price has 18 decimals
+            strikeTimes: new int256[](0),
+            strikePrices: new int256[](1e18), // required as the strike price has 18 decimals
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
