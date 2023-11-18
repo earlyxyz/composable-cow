@@ -29,6 +29,7 @@ import {GoodAfterTime} from "../src/types/GoodAfterTime.sol";
 import {PerpetualStableSwap} from "../src/types/PerpetualStableSwap.sol";
 import {TradeAboveThreshold} from "../src/types/TradeAboveThreshold.sol";
 import {StopLoss} from "../src/types/StopLoss.sol";
+import {Limit4D} from "../src/types/Limit4D.sol";
 
 contract DeployAnvilStack is Script {
     // --- constants
@@ -72,6 +73,7 @@ contract DeployAnvilStack is Script {
         new PerpetualStableSwap();
         new TradeAboveThreshold();
         new StopLoss();
+        new Limit4D();
 
         vm.stopBroadcast();
 

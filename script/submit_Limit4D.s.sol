@@ -33,7 +33,7 @@ contract SubmitSingleLimit4D is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         Safe safe = Safe(payable(vm.envAddress("SAFE")));
-        Limit4D limit4D = Limit4D(vm.envAddress("4D_LIMIT"));
+        Limit4D limit4D = Limit4D(vm.envAddress("LIMIT_4D"));
         ComposableCoW composableCow = ComposableCoW(vm.envAddress("COMPOSABLE_COW"));
         IAggregatorV3Interface sellTokenPriceOracle = IAggregatorV3Interface(vm.envAddress("SELL_TOKEN_PRICE_ORACLE"));
         IAggregatorV3Interface buyTokenPriceOracle = IAggregatorV3Interface(vm.envAddress("BUY_TOKEN_PRICE_ORACLE"));
@@ -66,7 +66,7 @@ contract SubmitSingleLimit4D is Script {
                 (
                     IConditionalOrder.ConditionalOrderParams({
                         handler: IConditionalOrder(limit4D),
-                        salt: keccak256(abi.encodePacked("4D_LIMIT")),
+                        salt: keccak256(abi.encodePacked("LIMIT_4D")),
                         staticInput: abi.encode(orderData)
                     }),
                     true
