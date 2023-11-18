@@ -42,7 +42,7 @@ library ConditionalOrdersUtilsLib {
     function interpolate(int256[] memory xs, int256[] memory ys, int256 x) internal pure returns (int256) {
         require(xs.length > 0, "xs.length must be greater than 0");
         require(ys.length > 0, "ys.length must be greater than 0");
-        require(xs.length != ys.length, "xs.length must equal ys.length");
+        require(xs.length == ys.length, "xs.length must equal ys.length");
 
         // Single x coordinate is treated as a flat line.
         if (xs.length == 1 && ys.length == 1) {
