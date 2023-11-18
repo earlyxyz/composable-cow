@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.0 <0.9.0;
 
-import "forge-std/console2.sol";
-
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 
 import "../BaseConditionalOrder.sol";
@@ -91,24 +89,11 @@ contract Limit4D is BaseConditionalOrder {
 
             /// @dev Interpolate the strike price at the current time
             int256 strikePrice = interpolate(data.strikeTimes, data.strikePrices, int256(block.timestamp));
-            console2.log("block.timestamp: %d", int256(block.timestamp));
-            console2.log("strikes: [");
-            for (uint8 i = 0; i < data.strikeTimes.length; i++) {
-              console2.logString("(");
-              console2.logInt(data.strikeTimes[i]);
-              console2.logInt(data.strikePrices[i]);
-              console2.logString(")");
-            }
-            console2.log("]");
-            console2.log("strikePrice: %d", strikePrice);
 
             // Normalize the decimals for basePrice and quotePrice, scaling them to 18 decimals
             // Caution: Ensure that base and quote have the same numeraires (e.g. both are denominated in USD)
             basePrice = Utils.scalePrice(basePrice, data.sellTokenPriceOracle.decimals(), 18);
             quotePrice = Utils.scalePrice(quotePrice, data.buyTokenPriceOracle.decimals(), 18);
-
-            console2.log("basePrice: %d", basePrice);
-            console2.log("quotePrice: %d", quotePrice);
 
             /// @dev Scale the strike price to 18 decimals.
             if (!(basePrice * SCALING_FACTOR / quotePrice <= strikePrice)) {
