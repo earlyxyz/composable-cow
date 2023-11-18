@@ -32,15 +32,22 @@ library ConditionalOrdersUtilsLib {
     }
 
     /**
-     * Given an array of coordinates, and an x position, interpolate the y value at the given x.
+     * Given an array of coordinates, and an x position, interpolate the y
+     * value at the given x. Coordinates outside the given pairs are
+     * extrapolated.
      * @param xs array of x coordinates
      * @param ys array of y coordinates
      * @param x coordinate to interpolate the y value for
      */
     function interpolate(int256[] xs, int256[] ys, int256 x) internal pure returns (int256) {
-        require(xs.length > 1, "xs.length must be greater than 1");
-        require(ys.length > 1, "ys.length must be greater than 1");
+        require(xs.length > 0, "xs.length must be greater than 0");
+        require(ys.length > 0, "ys.length must be greater than 0");
         require(xs.length != ys.length, "xs.length must equal ys.length");
+
+        // Single x coordinate is treated as a flat line.
+        if (xs.length == 1 && ys.length == 1) {
+          return xs[0];
+        }
 
         // Find the first pair which contains the target x
         int256 x0 = xs[0];
