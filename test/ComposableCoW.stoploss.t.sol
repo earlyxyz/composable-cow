@@ -44,24 +44,63 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
     }
 
     function test_strikePriceArrayNotMet_concrete() public {
-      // TODO: test with multiple strike prices
-      //       - extrapolated left
-      //       - extrapolated right
-      //       - interpolated
-      //       - fuzz
-    }
+        // TODO: test with multiple strike prices
+        //       - interpolated
+        //       - extrapolated left
+        //       - extrapolated right
+        //       - fuzz
 
-    function test_strikePriceNotMet_concrete() public {
         // prevents underflow when checking for stale prices
         vm.warp(30 minutes);
+
+        int256[] memory strikeTimes = new int256[](2);
+        strikeTimes[0] = int256(block.timestamp);
+        strikeTimes[1] = int256(block.timestamp + 10 minutes);
+
+        int256[] memory strikePrices = new int256[](2);
+        strikePrices[0] = 10;
+        strikePrices[1] = 20;
 
         StopLoss.Data memory data = StopLoss.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 200 ether, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, block.timestamp, DEFAULT_DECIMALS),
-            strikeTimes: new int256[](0),
-            strikePrices: new int256[](1),
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
+            sellAmount: 1 ether,
+            buyAmount: 1 ether,
+            appData: APP_DATA,
+            receiver: address(0x0),
+            isSellOrder: false,
+            isPartiallyFillable: false,
+            validityBucketSeconds: 15 minutes,
+            maxTimeSinceLastOracleUpdate: 15 minutes
+        });
+
+        createOrder(stopLoss, 0x0, abi.encode(data));
+
+        vm.expectRevert(abi.encodeWithSelector(IConditionalOrder.OrderNotValid.selector, STRIKE_NOT_REACHED));
+        stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+    }
+
+    function test_strikePriceNotMet_concrete() public {
+        // prevents underflow when checking for stale prices
+        vm.warp(30 minutes);
+
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = 1;
+
+        StopLoss.Data memory data = StopLoss.Data({
+            sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
+            buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
+            sellTokenPriceOracle: mockOracle(SELL_ORACLE, 200 ether, block.timestamp, DEFAULT_DECIMALS),
+            buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, block.timestamp, DEFAULT_DECIMALS),
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -93,14 +132,19 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
 
         vm.warp(currentTime);
 
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = strike;
+
         StopLoss.Data memory data = StopLoss.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, sellTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, buyTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
-            strikeTimes: new int256[](0),
-            // TODO: Figure out why we have to convert to uint256 here. wtf.
-            strikePrices: new int256[](uint256(strike)),
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -133,6 +177,20 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
 
         vm.warp(1687718451);
 
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        // Strike price is to 18 decimals, base / quote. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
+        strikePrices[0] = int256(
+            1900
+                * (
+                    sellTokenERC20Decimals > buyTokenERC20Decimals
+                        ? (10 ** (sellTokenERC20Decimals - buyTokenERC20Decimals + 18))
+                        : (10 ** (buyTokenERC20Decimals - sellTokenERC20Decimals + 18))
+                )
+        );
+
         StopLoss.Data memory data = StopLoss.Data({
             sellToken: mockToken(SELL_TOKEN, sellTokenERC20Decimals),
             buyToken: mockToken(BUY_TOKEN, buyTokenERC20Decimals),
@@ -142,16 +200,8 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
             buyTokenPriceOracle: mockOracle(
                 BUY_ORACLE, int256(1 * (10 ** buyTokenOracleDecimals)), block.timestamp, buyTokenOracleDecimals
                 ),
-            strikeTimes: new int256[](0),
-            strikePrices: new int256[](uint256(
-                1900
-                    * (
-                        sellTokenERC20Decimals > buyTokenERC20Decimals
-                            ? (10 ** (sellTokenERC20Decimals - buyTokenERC20Decimals + 18))
-                            : (10 ** (buyTokenERC20Decimals - sellTokenERC20Decimals + 18))
-                    )
-                )
-            ), // Strike price is to 18 decimals, base / quote. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1,
             appData: APP_DATA,
@@ -182,13 +232,20 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         // 25 June 2023 18:40:51
         vm.warp(1687718451);
 
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        // Strike price is base / quote to 18 decimals. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
+        strikePrices[0] = 1900_000_000_000_000_000_000;
+
         StopLoss.Data memory data = StopLoss.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS), // simulate ETH (using the ETH/USD chainlink)
             buyToken: mockToken(BUY_TOKEN, 6), // simulate USDC (using the USDC/USD chainlink)
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 183_449_235_095, block.timestamp, 8), // assume price is 1834.49235095 ETH/USD
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100_000_000, block.timestamp, 8), // assume 1:1 USDC:USD
-            strikeTimes: new int256[](0),
-            strikePrices: new int256[](1900_000_000_000_000_000_000), // Strike price is base / quote to 18 decimals. ie. 1900_000_000_000_000_000_000 = 1900 USDC/ETH
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1,
             appData: APP_DATA,
@@ -228,13 +285,19 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
 
         vm.warp(currentTime);
 
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = 1;
+
         StopLoss.Data memory data = StopLoss.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 100 ether, updatedAt, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, updatedAt, DEFAULT_DECIMALS),
-            strikeTimes: new int256[](0),
-            strikePrices: new int256[](1),
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -258,13 +321,20 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
 
         // case where sell token price is invalid
 
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = 1;
+
+
         StopLoss.Data memory data = StopLoss.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, invalidPrice, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, validPrice, block.timestamp, DEFAULT_DECIMALS),
-            strikeTimes: new int256[](0),
-            strikePrices: new int256[](1),
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -296,13 +366,74 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
         // 25 June 2023 18:40:51
         vm.warp(1687718451);
 
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = strike;
+
         StopLoss.Data memory data = StopLoss.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, sellTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, buyTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
-            strikeTimes: new int256[](0),
-            strikePrices: new int256[](uint256(strike)),
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
+            sellAmount: 1 ether,
+            buyAmount: 1 ether,
+            appData: APP_DATA,
+            receiver: address(0x0),
+            isSellOrder: false,
+            isPartiallyFillable: false,
+            validityBucketSeconds: 15 minutes,
+            maxTimeSinceLastOracleUpdate: 15 minutes
+        });
+
+        GPv2Order.Data memory order =
+            stopLoss.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+        assertEq(address(order.sellToken), address(SELL_TOKEN));
+        assertEq(address(order.buyToken), address(BUY_TOKEN));
+        assertEq(order.sellAmount, 1 ether);
+        assertEq(order.buyAmount, 1 ether);
+        assertEq(order.receiver, address(0x0));
+        assertEq(order.validTo, 1687718700);
+        assertEq(order.appData, APP_DATA);
+        assertEq(order.feeAmount, 0);
+        assertEq(order.kind, GPv2Order.KIND_BUY);
+        assertEq(order.partiallyFillable, false);
+        assertEq(order.sellTokenBalance, GPv2Order.BALANCE_ERC20);
+        assertEq(order.buyTokenBalance, GPv2Order.BALANCE_ERC20);
+    }
+
+    function test_strikePriceArrayMet_fuzz(int256 sellTokenOraclePrice, int256 buyTokenOraclePrice, int256 strikeBefore, int256 strikeAfter) public {
+        vm.assume(buyTokenOraclePrice > 0);
+        vm.assume(sellTokenOraclePrice > 0 && sellTokenOraclePrice <= type(int256).max / 10 ** 18);
+        vm.assume(strikeBefore > 0);
+        vm.assume(strikeAfter > 0);
+
+        // For this test we set the current time to half-way between the two
+        // strike prices, so the interpolated value "now" should be the mean.
+        int256 meanStrike = strikeBefore + ((strikeAfter - strikeBefore) / 2);
+        vm.assume(sellTokenOraclePrice * int256(10 ** 18) / buyTokenOraclePrice <= meanStrike);
+
+        // 25 June 2023 18:40:51
+        vm.warp(1687718451);
+
+        int256[] memory strikeTimes = new int256[](2);
+        strikeTimes[0] = int256(block.timestamp - 10 minutes);
+        strikeTimes[1] = int256(block.timestamp + 10 minutes);
+
+        int256[] memory strikePrices = new int256[](2);
+        strikePrices[0] = strikeBefore;
+        strikePrices[1] = strikeAfter;
+
+        StopLoss.Data memory data = StopLoss.Data({
+            sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
+            buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
+            sellTokenPriceOracle: mockOracle(SELL_ORACLE, sellTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
+            buyTokenPriceOracle: mockOracle(BUY_ORACLE, buyTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
@@ -332,13 +463,20 @@ contract ComposableCoWStopLossTest is BaseComposableCoWTest {
     function test_validTo() public {
         uint256 BLOCK_TIMESTAMP = 1687712399;
 
+        int256[] memory strikeTimes = new int256[](1);
+        strikeTimes[0] = 0;
+
+        int256[] memory strikePrices = new int256[](1);
+        strikePrices[0] = 1e18;
+
+
         StopLoss.Data memory data = StopLoss.Data({
             sellToken: mockToken(SELL_TOKEN, 18),
             buyToken: mockToken(BUY_TOKEN, 18),
             sellTokenPriceOracle: mockOracle(SELL_ORACLE, 99 ether, BLOCK_TIMESTAMP, DEFAULT_DECIMALS),
             buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, BLOCK_TIMESTAMP, DEFAULT_DECIMALS),
-            strikeTimes: new int256[](0),
-            strikePrices: new int256[](1e18), // required as the strike price has 18 decimals
+            strikeTimes: strikeTimes,
+            strikePrices: strikePrices,
             sellAmount: 1 ether,
             buyAmount: 1 ether,
             appData: APP_DATA,
