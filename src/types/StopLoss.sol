@@ -39,7 +39,8 @@ contract StopLoss is BaseConditionalOrder {
      * @param validityBucketSeconds: How long the order will be valid. E.g. if the validityBucket is set to 15 minutes and the order is placed at 00:08, it will be valid until 00:15
      * @param sellTokenPriceOracle: A chainlink-like oracle returning the current sell token price in a given numeraire
      * @param buyTokenPriceOracle: A chainlink-like oracle returning the current buy token price in the same numeraire
-     * @param strike: The exchange rate (denominated in sellToken/buyToken) which triggers the StopLoss order if the oracle price falls below. Specified in base / quote with 18 decimals.
+     * @param strikeTimes: The times paired to each strikeValue. The strikeTime and strikeValue together are interpolated to determine the strikePrice at any intermediate point.
+     * @param strikeValues: The exchange rate (denominated in sellToken/buyToken) which triggers the StopLoss order if the oracle price falls below. Specified in base / quote with 18 decimals.
      * @param maxTimeSinceLastOracleUpdate: The maximum time since the last oracle update. If the oracle hasn't been updated in this time, the order will be considered invalid
      */
     struct Data {
@@ -54,7 +55,8 @@ contract StopLoss is BaseConditionalOrder {
         uint32 validityBucketSeconds;
         IAggregatorV3Interface sellTokenPriceOracle;
         IAggregatorV3Interface buyTokenPriceOracle;
-        int256 strike;
+        int256[] strikeTimes;
+        int256[] strikeValues;
         uint256 maxTimeSinceLastOracleUpdate;
     }
 
@@ -85,13 +87,16 @@ contract StopLoss is BaseConditionalOrder {
                 revert IConditionalOrder.OrderNotValid(ORACLE_STALE_PRICE);
             }
 
+            /// @dev Interpolate the strike price at the current time
+            strikePrice = Utils.interpolate(data.strikeTimes, data.strikeValues, int256(block.timestamp));
+
             // Normalize the decimals for basePrice and quotePrice, scaling them to 18 decimals
             // Caution: Ensure that base and quote have the same numeraires (e.g. both are denominated in USD)
             basePrice = Utils.scalePrice(basePrice, data.sellTokenPriceOracle.decimals(), 18);
             quotePrice = Utils.scalePrice(quotePrice, data.buyTokenPriceOracle.decimals(), 18);
 
             /// @dev Scale the strike price to 18 decimals.
-            if (!(basePrice * SCALING_FACTOR / quotePrice <= data.strike)) {
+            if (!(basePrice * SCALING_FACTOR / quotePrice <= strikePrice)) {
                 revert IConditionalOrder.OrderNotValid(STRIKE_NOT_REACHED);
             }
         }
