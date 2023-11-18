@@ -130,9 +130,9 @@ contract StopLoss is BaseConditionalOrder {
         require(ys.length > 0, "ys.length must be greater than 0");
         require(xs.length == ys.length, "xs.length must equal ys.length");
 
-        // Single x coordinate is treated as a flat line.
-        if (xs.length == 1 && ys.length == 1) {
-          return xs[0];
+        // Single coordinate is treated as a flat line.
+        if (ys.length == 1) {
+          return ys[0];
         }
 
         // Find the first pair which contains the target x
