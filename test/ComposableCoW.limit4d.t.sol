@@ -43,19 +43,22 @@ contract ComposableCoWLimit4DTest is BaseComposableCoWTest {
         vm.mockCall(address(token), abi.encodeWithSelector(iface.decimals.selector), abi.encode(decimals));
     }
 
-    function test_strikePriceArrayNotMet_concrete() public {
-        // TODO: test with multiple strike prices
-        //       - interpolated
-        //       - extrapolated left
-        //       - extrapolated right
-        //       - fuzz
+    function test_strikePriceNotMet_concrete() public {
+        // Interpolated
+        test_strikePriceNotMet_concrete_helper(block.timestamp - 5 minutes, block.timestamp + 5 minutes);
+        // extrapolated to the left
+        test_strikePriceNotMet_concrete_helper(block.timestamp + 5 minutes, block.timestamp + 10 minutes);
+        // extrapolated to the right
+        test_strikePriceNotMet_concrete_helper(block.timestamp - 10 minutes, block.timestamp - 5 minutes);
+    }
 
+    function test_strikePriceNotMet_concrete_helper(uint256 t1, uint256 t2) internal {
         // prevents underflow when checking for stale prices
         vm.warp(30 minutes);
 
         int256[] memory strikeTimes = new int256[](2);
-        strikeTimes[0] = int256(block.timestamp);
-        strikeTimes[1] = int256(block.timestamp + 10 minutes);
+        strikeTimes[0] = int256(t1);
+        strikeTimes[1] = int256(t2);
 
         int256[] memory strikePrices = new int256[](2);
         strikePrices[0] = 10;
@@ -84,21 +87,27 @@ contract ComposableCoWLimit4DTest is BaseComposableCoWTest {
         limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
     }
 
-    function test_strikePriceNotMet_concrete() public {
+    function test_strikePriceMetAfterTime_concrete() public {
         // prevents underflow when checking for stale prices
         vm.warp(30 minutes);
 
-        int256[] memory strikeTimes = new int256[](1);
-        strikeTimes[0] = 0;
+        int256[] memory strikeTimes = new int256[](4);
+        strikeTimes[0] = int256(0);
+        strikeTimes[1] = int256(block.timestamp + 59 seconds);
+        strikeTimes[2] = int256(block.timestamp + 60 seconds);
+        strikeTimes[3] = int256(block.timestamp + 10 minutes);
 
-        int256[] memory strikePrices = new int256[](1);
-        strikePrices[0] = 1;
+        int256[] memory strikePrices = new int256[](4);
+        strikePrices[0] = 10 ether;
+        strikePrices[1] = 10 ether;
+        strikePrices[2] = 20 ether;
+        strikePrices[3] = 20 ether;
 
         Limit4D.Data memory data = Limit4D.Data({
             sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
             buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
-            sellTokenPriceOracle: mockOracle(SELL_ORACLE, 200 ether, block.timestamp, DEFAULT_DECIMALS),
-            buyTokenPriceOracle: mockOracle(BUY_ORACLE, 100 ether, block.timestamp, DEFAULT_DECIMALS),
+            sellTokenPriceOracle: mockOracle(SELL_ORACLE, 15 ether, block.timestamp, DEFAULT_DECIMALS),
+            buyTokenPriceOracle: mockOracle(BUY_ORACLE, 1 ether, block.timestamp, DEFAULT_DECIMALS),
             strikeTimes: strikeTimes,
             strikePrices: strikePrices,
             sellAmount: 1 ether,
@@ -110,14 +119,39 @@ contract ComposableCoWLimit4DTest is BaseComposableCoWTest {
             validityBucketSeconds: 15 minutes,
             maxTimeSinceLastOracleUpdate: 15 minutes
         });
+        uint validTo = block.timestamp + 15 minutes;
 
         createOrder(limit4D, 0x0, abi.encode(data));
 
+        // Wait until the strike price is almost ready to drop.
+        vm.warp(block.timestamp + 58 seconds);
+
+        // Check it is not met yet.
         vm.expectRevert(abi.encodeWithSelector(IConditionalOrder.OrderNotValid.selector, STRIKE_NOT_REACHED));
         limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+
+        // Wait a few seconds while the interpolated strike price drops
+        vm.warp(block.timestamp + 61 seconds);
+
+        // Check the order is now tradeable
+        GPv2Order.Data memory order =
+            limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
+        assertEq(address(order.sellToken), address(SELL_TOKEN));
+        assertEq(address(order.buyToken), address(BUY_TOKEN));
+        assertEq(order.sellAmount, 1 ether);
+        assertEq(order.buyAmount, 1 ether);
+        assertEq(order.receiver, address(0x0));
+        assertEq(order.validTo, validTo);
+        assertEq(order.appData, APP_DATA);
+        assertEq(order.feeAmount, 0);
+        assertEq(order.kind, GPv2Order.KIND_BUY);
+        assertEq(order.partiallyFillable, false);
+        assertEq(order.sellTokenBalance, GPv2Order.BALANCE_ERC20);
+        assertEq(order.buyTokenBalance, GPv2Order.BALANCE_ERC20);
     }
 
-    function test_RevertStrikePriceNotMet_fuzz(
+
+    function test_RevertSingleStrikePriceNotMet_fuzz(
         int256 sellTokenOraclePrice,
         int256 buyTokenOraclePrice,
         int256 strike,
@@ -357,55 +391,7 @@ contract ComposableCoWLimit4DTest is BaseComposableCoWTest {
         limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
     }
 
-    function test_strikePriceMet_fuzz(int256 sellTokenOraclePrice, int256 buyTokenOraclePrice, int256 strike) public {
-        vm.assume(buyTokenOraclePrice > 0);
-        vm.assume(sellTokenOraclePrice > 0 && sellTokenOraclePrice <= type(int256).max / 10 ** 18);
-        vm.assume(strike > 0);
-        vm.assume(sellTokenOraclePrice * int256(10 ** 18) / buyTokenOraclePrice <= strike);
-
-        // 25 June 2023 18:40:51
-        vm.warp(1687718451);
-
-        int256[] memory strikeTimes = new int256[](1);
-        strikeTimes[0] = 0;
-
-        int256[] memory strikePrices = new int256[](1);
-        strikePrices[0] = strike;
-
-        Limit4D.Data memory data = Limit4D.Data({
-            sellToken: mockToken(SELL_TOKEN, DEFAULT_DECIMALS),
-            buyToken: mockToken(BUY_TOKEN, DEFAULT_DECIMALS),
-            sellTokenPriceOracle: mockOracle(SELL_ORACLE, sellTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
-            buyTokenPriceOracle: mockOracle(BUY_ORACLE, buyTokenOraclePrice, block.timestamp, DEFAULT_DECIMALS),
-            strikeTimes: strikeTimes,
-            strikePrices: strikePrices,
-            sellAmount: 1 ether,
-            buyAmount: 1 ether,
-            appData: APP_DATA,
-            receiver: address(0x0),
-            isSellOrder: false,
-            isPartiallyFillable: false,
-            validityBucketSeconds: 15 minutes,
-            maxTimeSinceLastOracleUpdate: 15 minutes
-        });
-
-        GPv2Order.Data memory order =
-            limit4D.getTradeableOrder(safe, address(0), bytes32(0), abi.encode(data), bytes(""));
-        assertEq(address(order.sellToken), address(SELL_TOKEN));
-        assertEq(address(order.buyToken), address(BUY_TOKEN));
-        assertEq(order.sellAmount, 1 ether);
-        assertEq(order.buyAmount, 1 ether);
-        assertEq(order.receiver, address(0x0));
-        assertEq(order.validTo, 1687718700);
-        assertEq(order.appData, APP_DATA);
-        assertEq(order.feeAmount, 0);
-        assertEq(order.kind, GPv2Order.KIND_BUY);
-        assertEq(order.partiallyFillable, false);
-        assertEq(order.sellTokenBalance, GPv2Order.BALANCE_ERC20);
-        assertEq(order.buyTokenBalance, GPv2Order.BALANCE_ERC20);
-    }
-
-    function test_strikePriceArrayMet_fuzz(int256 sellTokenOraclePrice, int256 buyTokenOraclePrice, int256 strikeBefore, int256 strikeAfter) public {
+    function test_strikePriceMet_fuzz(int256 sellTokenOraclePrice, int256 buyTokenOraclePrice, int256 strikeBefore, int256 strikeAfter) public {
         vm.assume(buyTokenOraclePrice > 0);
         vm.assume(sellTokenOraclePrice > 0 && sellTokenOraclePrice <= type(int256).max / 10 ** 18);
         vm.assume(strikeBefore > 0);
@@ -470,7 +456,6 @@ contract ComposableCoWLimit4DTest is BaseComposableCoWTest {
 
         int256[] memory strikePrices = new int256[](1);
         strikePrices[0] = 1e18;
-
 
         Limit4D.Data memory data = Limit4D.Data({
             sellToken: mockToken(SELL_TOKEN, 18),
