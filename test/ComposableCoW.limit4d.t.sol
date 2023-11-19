@@ -44,6 +44,7 @@ contract ComposableCoWLimit4DTest is BaseComposableCoWTest {
     }
 
     function test_strikePriceNotMet_concrete() public {
+        vm.warp(30 minutes);
         // Interpolated
         test_strikePriceNotMet_concrete_helper(block.timestamp - 5 minutes, block.timestamp + 5 minutes);
         // extrapolated to the left
