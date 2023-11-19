@@ -7,6 +7,8 @@ simple and powerful.
 The new order type is in
 https://github.com/earlyxyz/composable-cow/blob/main/src/types/Limit4D.sol.
 
+https://twitter.com/0xAegir/status/1726061870287585676
+
 ## Running the code
 
 To open a Limit4D order, first follow the setup in https://github.com/cowprotocol/composable-cow.
@@ -32,7 +34,7 @@ And to see the order execute, you can watch your account on: https://explorer.co
 
 Fundamentally, the innovation of Limit4D is that instead of taking a single
 price and time window, it takes a list of coordinates as `(time, price)`.
-In-between these times, it uses linear interpolation to determine the stike
+In-between these times, it uses linear interpolation to determine the strike
 price.
 
 For example, if you had the following list of coordinates `(t0, 1) -> (t10, 2)`,
