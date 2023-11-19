@@ -1,119 +1,110 @@
-# `ComposableCoW`: Composable Conditional orders
+# `Limit4D`: A new type of limit order
 
-This repository is the next in evolution of the [`conditional-smart-orders`](https://github.com/cowprotocol/conditional-smart-orders), providing a unified interface for stateless, composable conditional orders. `ComposableCoW` is designed to be used with the [`ExtensibleFallbackHandler`](https://github.com/rndlabs/safe-contracts/tree/merged-efh-sigmuxer), a powerful _extensible_ fallback handler that allows for significant customisation of a `Safe`, while preserving strong security guarantees.
+This repository builds on https://github.com/cowprotocol/composable-cow, adding
+a new type of limit order. The 4-dimensional limit order. It is both extremely
+simple and powerful.
 
-## Architecture
+The new order type is in
+https://github.com/earlyxyz/composable-cow/blob/main/src/types/Limit4D.sol.
 
-A detailed explanation on the architecture is available [here](https://hackmd.io/@mfw78/ByFP7Iazn).
+## Running the code
 
-### Methodology
+To open a Limit4D order, first follow the setup in https://github.com/cowprotocol/composable-cow.
 
-For the purposes of outlining the methodologies, it is assumed that:
+Next, modify the deployment script in `script/submit_SingleLimit4D.s.sol`, to
+have the order-type you want to execute. The parameters are similar to the basic
+StopLoss order, but you'll want to edit the `strikeTimes`, and `strikePrices`,
+to set the pricing curve for your order.
 
-1. The `Safe` has already had it's fallback handler set to `ExtensibleFallbackHandler`.
-2. The `Safe` has set the `domainVerifier` for the `GPv2Settlement.domainSeparator()` to `ComposableCoW`
+Then, to create the order run:
+```sh
+source .env
 
-#### Conditional order creation
+forge script \
+    script/submit_SingleLimit4D.s.sol:SubmitSingleLimit4D \
+    --rpc-url $ETH_RPC_URL \
+    --broadcast
+```
 
-A conditional order is a struct `ConditionalOrderParams`, consisting of:
+And to see the order execute, you can watch your account on: https://explorer.cow.fi
 
-1. The address of handler, ie. type of conditional order (such as `TWAP`).
-2. A unique salt.
-3. Implementation specific `staticInput` - data that is known at the creation time of the conditional order.
+## Modelling different order types
 
-##### Single Order
+Fundamentally, the innovation of Limit4D is that instead of taking a single
+price and time window, it takes a list of coordinates as `(time, price)`.
+In-between these times, it uses linear interpolation to determine the stike
+price.
 
-1. From the context of the Safe that is placing the order, call `ComposableCoW.create` with the `ConditionalOrderParams` struct. Optionally set `dispatch = true` to have events emitted that are picked up by a watch tower.
+For example, if you had the following list of coordinates `(t0, 1) -> (t10, 2)`,
+then at `t5`, the interpolated strike price would be `1.5`.
 
-##### Merkle Root
+By "rasterizing" different pricing curves into lists of coordinates, we can use
+a single 4D Limit order to model lots of different order types.
 
-1. Collect all the conditional orders, which are multiple structs of `ConditionalOrderParams`.
-2. Populate a merkle tree with the leaves from (1), where each leaf is a double hashed of the ABI-encoded struct.
-3. Determine the merkle root of the tree and set this as the root, calling `ComposableCoW.setRoot`. The `proof` must be set, and currently:
-   a. Set a `location` of `0` for no proofs emitted.
-   b. Otherwise, set a `location` of `1` at which case the payload in the proof will be interpted as an array of proofs and indexed by the watch tower.
+### Normal Limit Order
 
-#### Get Tradeable Order With Signature
+In this case, we only provide a single coordinate tuple. For example:
 
-Conditional orders may generate one or many discrete orders depending on their implementation. To retrieve a discrete order that is valid at the current block:
+`(now, price)`
 
-1. Call `ComposableCoW.getTradeableOrderWithSignature(address owner, ConditionalOrderParams params, bytes offchainInput, bytes32[] proof)` where:
-   - `owner`: smart contract / `Safe`
-   - `params`: mentioned above.
-   - `offchainInput` is any implementation specific offchain input for discrete order generation / validation.
-   - `proof`: a zero length array if a single order, otherwise the merkle proof for the merkle root that's set for `owner`.
-2. Decoding the `GPv2Order`, use this data to populate a `POST` to the CoW Protocol API to create an order. Set the `signingScheme` to `eip1271` and the `signature` to that returned from the call in (1).
-3. Review the order on [CoW Explorer](https://explorer.cow.fi/).
-4. `getTradeableOrderWithSignature(address,ConditionalOrderParams,bytes,bytes32[])` may revert with one of the custom errors. This provides feedback for watch towers to modify their internal state.
+Limit4D will interpret this as a flat line pricing.
 
-#### Conditional order cancellation
+### Market Order
 
-##### Single Order
+For a market order, we can pick an execution time, and then around that time, we drop the price so that the order is fulfilled instantly.
 
-1. Determine the digest for the conditional order, ie.`H(Params)`.
-2. Call `ComposableCoW.remove(H(Params))`
+Before the desired execution time, the price is `(before, infinite)`, and after it goes to `(after, 0)`.
 
-##### Merkle Root
+### Dutch Auction
 
-1. Prune the leaf from the merkle tree.
-2. Determine the new root.
-3. Call `ComposableCoW.setRoot` with the new root, which will invalidate any orders that have been pruned from the tree.
+To simulate a dutch auction, we start our price high, and end the price low.
 
-## Time-weighted average price (TWAP)
+`(auctionStartTime, highAuctionStartPrice) -> (auctionEndTime, lowAuctionEndPrice)`
 
-A simple _time-weighted average price_ trade may be thought of as `n` smaller trades happening every `t` time interval, commencing at time `t0`. Additionally, it is possible to limit a part's validity of the order to a certain `span` of time interval `t`.
+As the price decreases, the order will be filled whenever the price intersects
+the current market rate. The dutch auction is useful when selling an asset.
 
-### Data Structure
+### Normal Auction
+
+The opposite of a dutch auction. Useful when buying an asset.
+
+You start the price low, and increase it until reaching your maximum bid.
+
+`(auctionStartTime, minimumBid) -> (auctionEndTime, maximumBid)`
+
+### Automatically Trading Ascending/Descending Channels
+
+By using two 4D Limit orders together, you can automatically trade across a
+range. Even if that range is an ascending or descending channel.
+
+To do this you would set up one order to sell when the price moves above the
+channel, and a second one to buy when it moves below.
+
+### And More...
+
+There are probably many other trade preferences you can model with 4D Limit
+Orders. These are just a few ideas.
+
+## Data Structure
 
 ```solidity=
 struct Data {
     IERC20 sellToken;
     IERC20 buyToken;
     address receiver; // address(0) if the safe
-    uint256 partSellAmount; // amount to sell in each part
-    uint256 minPartLimit; // minimum buy amount in each part (limit)
-    uint256 t0;
-    uint256 n;
-    uint256 t;
-    uint256 span;
+    uint256 sellAmount;
+    uint256 buyAmount;
+    bytes32 appData;
+    bool isSellOrder;
+    bool isPartiallyFillable;
+    uint32 validityBucketSeconds;
+    IAggregatorV3Interface sellTokenPriceOracle;
+    IAggregatorV3Interface buyTokenPriceOracle;
+    int256[] strikeTimes;
+    int256[] strikePrices;
+    uint256 maxTimeSinceLastOracleUpdate;
 }
 ```
-
-**NOTE:** No direction of trade is specified, as for TWAP it is assumed to be a _sell_ order
-
-Example: Alice wants to sell 12,000,000 DAI for at least 7500 WETH. She wants to do this using a TWAP, executing a part each day over a period of 30 days.
-
-- `sellToken` = DAI
-- `buytoken` = WETH
-- `receiver` = `address(0)`
-- `partSellAmount` = 12000000 / 30 = 400000 DAI
-- `minPartLimit` = 7500 / 30 = 250 WETH
-- `t0` = Nominated start time (unix epoch seconds)
-- `n` = 30 (number of parts)
-- `t` = 86400 (duration of each part, in seconds)
-- `span` = 0 (duration of `span`, in seconds, or `0` for entire interval)
-
-If Alice also wanted to restrict the duration in which each part traded in each day, she may set `span` to a non-zero duration. For example, if Alice wanted to execute the TWAP, each day for 30 days, however only wanted to trade for the first 12 hours of each day, she would set `span` to `43200` (ie. `60 * 60 * 12`).
-
-Using `span` allows for use cases such as weekend or week-day only trading.
-
-### Methodology
-
-To create a TWAP order:
-
-1. ABI-Encode the `IConditionalOrder.ConditionalOrderParams` struct with:
-   - `handler`: set to the `TWAP` smart contract deployment.
-   - `salt`: set to a unique value.
-   - `staticInput`: the ABI-encoded `TWAP.Data` struct.
-2. Use the `struct` from (1) as either a Merkle leaf, or with `ComposableCoW.create` to create a single conditional order.
-3. Approve `GPv2VaultRelayer` to trade `n x partSellAmount` of the safe's `sellToken` tokens (in the example above, `GPv2VaultRelayer` would receive approval for spending 12,000,000 DAI tokens).
-
-**NOTE**: When calling `ComposableCoW.create`, setting `dispatch = true` will cause `ComposableCoW` to emit event logs that are indexed by the watch tower automatically. If you wish to maintain a private order (and will submit to the CoW Protocol API through your own infrastructure, you may set `dispatch` to `false`).
-
-Fortunately, when using Safe, it is possible to batch together all the above calls to perform this step atomically, and optimise gas consumption / UX. For code examples on how to do this, please refer to the [CLI](#CLI).
-
-**TODO**
-**NOTE:** For cancelling a TWAP order, follow the instructions at [Conditional order cancellation](#Conditional-order-cancellation).
 
 ## Developers
 
@@ -123,32 +114,15 @@ Fortunately, when using Safe, it is possible to batch together all the above cal
 
 ### Deployed Contracts
 
-| Contract Name                  | Ethereum Mainnet                                                                                                      | Goerli                                                                                                                       | Gnosis Chain                                                                                                           |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `ExtensibleFallbackHandler`    | [0x2f55e8b20D0B9FEFA187AA7d00B6Cbe563605bF5](https://etherscan.io/address/0x2f55e8b20D0B9FEFA187AA7d00B6Cbe563605bF5) | [0x2f55e8b20D0B9FEFA187AA7d00B6Cbe563605bF5](https://goerli.etherscan.io/address/0x2f55e8b20D0B9FEFA187AA7d00B6Cbe563605bF5) | [0x2f55e8b20D0B9FEFA187AA7d00B6Cbe563605bF5](https://gnosisscan.io/address/0x2f55e8b20D0B9FEFA187AA7d00B6Cbe563605bF5) |
-| `ComposableCoW`                | [0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74](https://etherscan.io/address/0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74) | [0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74](https://goerli.etherscan.io/address/0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74) | [0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74](https://gnosisscan.io/address/0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74) |
-| `TWAP`                         | [0x6cF1e9cA41f7611dEf408122793c358a3d11E5a5](https://etherscan.io/address/0x6cF1e9cA41f7611dEf408122793c358a3d11E5a5) | [0x6cF1e9cA41f7611dEf408122793c358a3d11E5a5](https://goerli.etherscan.io/address/0x6cF1e9cA41f7611dEf408122793c358a3d11E5a5) | [0x6cF1e9cA41f7611dEf408122793c358a3d11E5a5](https://gnosisscan.io/address/0x6cF1e9cA41f7611dEf408122793c358a3d11E5a5) |
-| `GoodAfterTime`                | [0xd3338f21c89745e46af56aeaf553cf96ba9bc66f](https://etherscan.io/address/0xd3338f21c89745e46af56aeaf553cf96ba9bc66f) | [0xd3338f21c89745e46af56aeaf553cf96ba9bc66f](https://goerli.etherscan.io/address/0xd3338f21c89745e46af56aeaf553cf96ba9bc66f) | [0xd3338f21c89745e46af56aeaf553cf96ba9bc66f](https://gnosisscan.io/address/0xd3338f21c89745e46af56aeaf553cf96ba9bc66f) |
-| `PerpetualStableSwap`          | [0x519BA24e959E33b3B6220CA98bd353d8c2D89920](https://etherscan.io/address/0x519BA24e959E33b3B6220CA98bd353d8c2D89920) | [0x519BA24e959E33b3B6220CA98bd353d8c2D89920](https://goerli.etherscan.io/address/0x519BA24e959E33b3B6220CA98bd353d8c2D89920) | [0x519BA24e959E33b3B6220CA98bd353d8c2D89920](https://gnosisscan.io/address/0x519BA24e959E33b3B6220CA98bd353d8c2D89920) |
-| `TradeAboveThreshold`          | [0x44569Cbd4E10dd5e97293337964Eff32d58ed352](https://etherscan.io/address/0x44569Cbd4E10dd5e97293337964Eff32d58ed352) | [0x44569Cbd4E10dd5e97293337964Eff32d58ed352](https://goerli.etherscan.io/address/0x44569Cbd4E10dd5e97293337964Eff32d58ed352) | [0x44569Cbd4E10dd5e97293337964Eff32d58ed352](https://gnosisscan.io/address/0x44569Cbd4E10dd5e97293337964Eff32d58ed352) |
-| `StopLoss`                     | [0xE8212F30C28B4AAB467DF3725C14d6e89C2eB967](https://etherscan.io/address/0xE8212F30C28B4AAB467DF3725C14d6e89C2eB967) | [0xE8212F30C28B4AAB467DF3725C14d6e89C2eB967](https://goerli.etherscan.io/address/0xE8212F30C28B4AAB467DF3725C14d6e89C2eB967) | [0xE8212F30C28B4AAB467DF3725C14d6e89C2eB967](https://gnosisscan.io/address/0xE8212F30C28B4AAB467DF3725C14d6e89C2eB967) |
-| `Limit4D`                     | | | [0x1989fd64aa8883c221f5c09ef58d673347a4c3cf](https://gnosisscan.io/address/0x1989fd64aa8883c221f5c09ef58d673347a4c3cf) |
-| `CurrentBlockTimestampFactory` | [0x52eD56Da04309Aca4c3FECC595298d80C2f16BAc](https://etherscan.io/address/0x52eD56Da04309Aca4c3FECC595298d80C2f16BAc) | [0x52eD56Da04309Aca4c3FECC595298d80C2f16BAc](https://goerli.etherscan.io/address/0x52eD56Da04309Aca4c3FECC595298d80C2f16BAc) | [0x52eD56Da04309Aca4c3FECC595298d80C2f16BAc](https://gnosisscan.io/address/0x52eD56Da04309Aca4c3FECC595298d80C2f16BAc) |
-
-#### Audits
-
-The above deployed contracts have been audited by:
-
-- Ackee Blockchain: [CoW Protocol - `ComposableCoW` and `ExtensibleFallbackHandler`](./audits/ackee-blockchain-cow-protocol-composablecow-extensiblefallbackhandler-report-1.2.pdf)
-- Gnosis internal audit: [ComposableCoW - May/July 2023](./audits/gnosis-ComposableCoWMayJul2023.pdf)
+| Contract Name                  | Gnosis Chain                                                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `Limit4D`                     | [0x1989fd64aa8883c221f5c09ef58d673347a4c3cf](https://gnosisscan.io/address/0x1989fd64aa8883c221f5c09ef58d673347a4c3cf) |
 
 ### Environment setup
 
 Copy the `.env.example` to `.env` and set the applicable configuration variables for the testing / deployment environment.
 
 ### Testing
-
-Effort has been made to adhere as close as possible to [best practices](https://book.getfoundry.sh/tutorials/best-practices), with _unit_, _fuzzing_ and _fork_ tests being implemented.
 
 **NOTE:** Fuzz tests also include a `simulate` that runs full end-to-end integration testing, including the ability to settle conditional orders. Fork testing simulates end-to-end against production ethereum mainnet contracts, and as such requires `ETH_RPC_URL` to be defined (this should correspond to an archive node).
 
@@ -192,7 +166,7 @@ For local integration testing, including the use of [Watch Tower](https://github
 
    ```bash
    source .env
-   forge scirpt script/deploy_AnvilStack.s.sol:DeployAnvilStack --rpc-url http://127.0.0.1:8545 --broadcast -vvvv
+   forge script script/deploy_AnvilStack.s.sol:DeployAnvilStack --rpc-url http://127.0.0.1:8545 --broadcast -vvvv
    ```
 
    **NOTE**: Within the output of the above command, there will be an address for a `Safe` that was deployed to `anvil`. This is needed for the next step.
@@ -203,5 +177,5 @@ For local integration testing, including the use of [Watch Tower](https://github
 
    ```bash
    source .env
-   SAFE="address here" forge script script/submit_SingleOrder.s.sol:SubmitSingleOrder --rpc-url http://127.0.0.1:8545 --broadcast
+   SAFE="address here" forge script script/submit_SingleLimit4D.s.sol:SubmitSingleLimit4D --rpc-url http://127.0.0.1:8545 --broadcast
    ```
