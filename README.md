@@ -118,7 +118,7 @@ struct Data {
 
 | Contract Name                  | Gnosis Chain                                                                                                           |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `Limit4D`                     | [0x1989fd64aa8883c221f5c09ef58d673347a4c3cf](https://gnosisscan.io/address/0x1989fd64aa8883c221f5c09ef58d673347a4c3cf) |
+| `Limit4D`                     | [0x13836e7B843c5BA401E69Cf1D4B21CaFcE0aa623](https://gnosisscan.io/address/0x13836e7B843c5BA401E69Cf1D4B21CaFcE0aa623) |
 
 ### Environment setup
 
