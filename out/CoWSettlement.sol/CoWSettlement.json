@@ -1,0 +1,210 @@
+{
+  "abi": [
+    {
+      "inputs": [],
+      "name": "domainSeparator",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": {
+    "object": "0x",
+    "sourceMap": "",
+    "linkReferences": {}
+  },
+  "deployedBytecode": {
+    "object": "0x",
+    "sourceMap": "",
+    "linkReferences": {}
+  },
+  "methodIdentifiers": {
+    "domainSeparator()": "f698da25"
+  },
+  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.19+commit.7dd6d404\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"domainSeparator\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"src/vendored/CoWSettlement.sol\":\"CoWSettlement\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":20000},\"remappings\":[\":@openzeppelin/=lib/@openzeppelin/contracts/\",\":@openzeppelin/contracts/=lib/@openzeppelin/contracts/\",\":balancer/=lib/balancer/src/\",\":canonical-weth/=lib/canonical-weth/src/\",\":cowprotocol/=lib/cowprotocol/src/contracts/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":erc4626-tests/=lib/@openzeppelin/lib/erc4626-tests/\",\":forge-std/=lib/forge-std/src/\",\":helpers/=lib/balancer/src/lib/helpers/\",\":math/=lib/balancer/src/lib/math/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/\",\":openzeppelin/=lib/@openzeppelin/contracts/\",\":safe/=lib/safe/contracts/\"]},\"sources\":{\"src/vendored/CoWSettlement.sol\":{\"keccak256\":\"0x4e4e317b24017cd87eb11d16368b8c06ec19306d31946c330a86f9f136df38d7\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://34b9b2fc2c89e60497457cd812da9c53718c15ddfbf70f6e11832d22092c1840\",\"dweb:/ipfs/QmYFzaynWZfdpmFRf2dZrQ32Ep53AtQDd5fTE3a89xVkaR\"]}},\"version\":1}",
+  "metadata": {
+    "compiler": {
+      "version": "0.8.19+commit.7dd6d404"
+    },
+    "language": "Solidity",
+    "output": {
+      "abi": [
+        {
+          "inputs": [],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "domainSeparator",
+          "outputs": [
+            {
+              "internalType": "bytes32",
+              "name": "",
+              "type": "bytes32"
+            }
+          ]
+        }
+      ],
+      "devdoc": {
+        "kind": "dev",
+        "methods": {},
+        "version": 1
+      },
+      "userdoc": {
+        "kind": "user",
+        "methods": {},
+        "version": 1
+      }
+    },
+    "settings": {
+      "remappings": [
+        "@openzeppelin/=lib/@openzeppelin/contracts/",
+        "@openzeppelin/contracts/=lib/@openzeppelin/contracts/",
+        "balancer/=lib/balancer/src/",
+        "canonical-weth/=lib/canonical-weth/src/",
+        "cowprotocol/=lib/cowprotocol/src/contracts/",
+        "ds-test/=lib/forge-std/lib/ds-test/src/",
+        "erc4626-tests/=lib/@openzeppelin/lib/erc4626-tests/",
+        "forge-std/=lib/forge-std/src/",
+        "helpers/=lib/balancer/src/lib/helpers/",
+        "math/=lib/balancer/src/lib/math/",
+        "murky/=lib/murky/src/",
+        "openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/",
+        "openzeppelin/=lib/@openzeppelin/contracts/",
+        "safe/=lib/safe/contracts/"
+      ],
+      "optimizer": {
+        "enabled": true,
+        "runs": 20000
+      },
+      "metadata": {
+        "bytecodeHash": "ipfs"
+      },
+      "compilationTarget": {
+        "src/vendored/CoWSettlement.sol": "CoWSettlement"
+      },
+      "libraries": {}
+    },
+    "sources": {
+      "src/vendored/CoWSettlement.sol": {
+        "keccak256": "0x4e4e317b24017cd87eb11d16368b8c06ec19306d31946c330a86f9f136df38d7",
+        "urls": [
+          "bzz-raw://34b9b2fc2c89e60497457cd812da9c53718c15ddfbf70f6e11832d22092c1840",
+          "dweb:/ipfs/QmYFzaynWZfdpmFRf2dZrQ32Ep53AtQDd5fTE3a89xVkaR"
+        ],
+        "license": "MIT"
+      }
+    },
+    "version": 1
+  },
+  "ast": {
+    "absolutePath": "src/vendored/CoWSettlement.sol",
+    "id": 56643,
+    "exportedSymbols": {
+      "CoWSettlement": [
+        56642
+      ]
+    },
+    "nodeType": "SourceUnit",
+    "src": "32:125:155",
+    "nodes": [
+      {
+        "id": 56636,
+        "nodeType": "PragmaDirective",
+        "src": "32:31:155",
+        "nodes": [],
+        "literals": [
+          "solidity",
+          ">=",
+          "0.8",
+          ".0",
+          "<",
+          "0.9",
+          ".0"
+        ]
+      },
+      {
+        "id": 56642,
+        "nodeType": "ContractDefinition",
+        "src": "65:91:155",
+        "nodes": [
+          {
+            "id": 56641,
+            "nodeType": "FunctionDefinition",
+            "src": "95:59:155",
+            "nodes": [],
+            "functionSelector": "f698da25",
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "domainSeparator",
+            "nameLocation": "104:15:155",
+            "parameters": {
+              "id": 56637,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "119:2:155"
+            },
+            "returnParameters": {
+              "id": 56640,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 56639,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 56641,
+                  "src": "145:7:155",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bytes32",
+                    "typeString": "bytes32"
+                  },
+                  "typeName": {
+                    "id": 56638,
+                    "name": "bytes32",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "145:7:155",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bytes32",
+                      "typeString": "bytes32"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "144:9:155"
+            },
+            "scope": 56642,
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "abstract": false,
+        "baseContracts": [],
+        "canonicalName": "CoWSettlement",
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "fullyImplemented": false,
+        "linearizedBaseContracts": [
+          56642
+        ],
+        "name": "CoWSettlement",
+        "nameLocation": "75:13:155",
+        "scope": 56643,
+        "usedErrors": []
+      }
+    ],
+    "license": "MIT"
+  },
+  "id": 155
+}
