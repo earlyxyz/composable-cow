@@ -15,6 +15,12 @@ string constant ORACLE_INVALID_PRICE = "oracle invalid price";
 string constant ORACLE_STALE_PRICE = "oracle stale price";
 /// @dev The strike price has not been reached
 string constant STRIKE_NOT_REACHED = "strike not reached";
+/// @dev The user passed invalid data for strike times or strike prices
+string constant MISSING_TIMES = "missing strike times";
+/// @dev The user passed invalid data for strike times or strike prices
+string constant MISSING_PRICES = "missing strike prices";
+/// @dev The user passed invalid data for strike times or strike prices
+string constant MISMATCHED_PRICES_AND_TIMES = "mismatched strike prices and times";
 
 /**
  * @title Limit4D conditional order
@@ -79,10 +85,8 @@ contract Limit4D is BaseConditionalOrder {
 
             /// @dev Guard against stale data at a user-specified interval. The maxTimeSinceLastOracleUpdate should at least exceed the both oracles' update intervals.
             if (
-                !(
-                    sellUpdatedAt >= block.timestamp - data.maxTimeSinceLastOracleUpdate
-                        && buyUpdatedAt >= block.timestamp - data.maxTimeSinceLastOracleUpdate
-                )
+              sellUpdatedAt + data.maxTimeSinceLastOracleUpdate < block.timestamp
+                || buyUpdatedAt + data.maxTimeSinceLastOracleUpdate < block.timestamp
             ) {
                 revert IConditionalOrder.OrderNotValid(ORACLE_STALE_PRICE);
             }
@@ -126,13 +130,19 @@ contract Limit4D is BaseConditionalOrder {
      * @param x coordinate to interpolate the y value for
      */
     function interpolate(int256[] memory xs, int256[] memory ys, int256 x) internal pure returns (int256) {
-        require(xs.length > 0, "xs.length must be greater than 0");
-        require(ys.length > 0, "ys.length must be greater than 0");
-        require(xs.length == ys.length, "xs.length must equal ys.length");
-
         // Single coordinate is treated as a flat line.
         if (ys.length == 1) {
-          return ys[0];
+            return ys[0];
+        }
+
+        if (xs.length == 0) {
+            revert IConditionalOrder.OrderNotValid(MISSING_TIMES);
+        }
+        if (ys.length == 0) {
+            revert IConditionalOrder.OrderNotValid(MISSING_PRICES);
+        }
+        if (xs.length != ys.length) {
+            revert IConditionalOrder.OrderNotValid(MISMATCHED_PRICES_AND_TIMES);
         }
 
         // Find the first pair which contains the target x

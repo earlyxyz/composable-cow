@@ -43,8 +43,8 @@ contract SubmitSingleLimit4D is Script {
         // orders are a superset of many other order types.
         int256[] memory strikeTimes = new int256[](4);
         strikeTimes[0] = 0;
-        strikeTimes[1] = 1700349021; // Sat Nov 18 2023 23:10:21 GMT+0000
-        strikeTimes[2] = 1700349022; // A second after that
+        strikeTimes[1] = int256(block.timestamp + 30 seconds);
+        strikeTimes[2] = int256(block.timestamp + 31 seconds);
         strikeTimes[3] = type(int256).max;
 
         int256[] memory strikePrices = new int256[](4);
@@ -61,10 +61,10 @@ contract SubmitSingleLimit4D is Script {
             buyTokenPriceOracle: buyTokenPriceOracle,
             strikeTimes: strikeTimes,
             strikePrices: strikePrices,
-            sellAmount: 1e18 / 10, // 0.1 dai
+            sellAmount: 0.1 ether, // 0.1 dai
             buyAmount: 1, // min buy amount
             appData: bytes32(0x0),
-            receiver: address(safe),
+            receiver: address(0), // Back to the safe
             isSellOrder: true,
             isPartiallyFillable: true,
             validityBucketSeconds: 15 minutes,
