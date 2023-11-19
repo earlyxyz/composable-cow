@@ -38,10 +38,13 @@ contract SubmitSingleLimit4D is Script {
         IAggregatorV3Interface sellTokenPriceOracle = IAggregatorV3Interface(vm.envAddress("SELL_TOKEN_PRICE_ORACLE"));
         IAggregatorV3Interface buyTokenPriceOracle = IAggregatorV3Interface(vm.envAddress("BUY_TOKEN_PRICE_ORACLE"));
 
+        // These strike times and prices are set up to act as a delayed market
+        // order. This shows a simple use-case, but demonstrates how Limit4D
+        // orders are a superset of many other order types.
         int256[] memory strikeTimes = new int256[](4);
         strikeTimes[0] = 0;
-        strikeTimes[1] = 1700349021;
-        strikeTimes[2] = 1700349022;
+        strikeTimes[1] = 1700349021; // Sat Nov 18 2023 23:10:21 GMT+0000
+        strikeTimes[2] = 1700349022; // A second after that
         strikeTimes[3] = type(int256).max;
 
         int256[] memory strikePrices = new int256[](4);
